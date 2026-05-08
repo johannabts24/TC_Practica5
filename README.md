@@ -701,6 +701,8 @@ Este método constituye la contraparte del Teorema de Kleene, encargándose de t
 
 * **Salida de Control:** Se incluye un mensaje en consola confirmando la generación exitosa del AFN. Este mensaje sirve como una herramienta de depuración esencial durante el desarrollo de la práctica para verificar en tiempo real qué expresión está procesando el motor lógico.
 
+# Logica de ```grammar.py```
+
 ### Gestión y Transformación de Gramáticas (`class Grammar`)
 Esta clase constituye el núcleo del procesamiento de lenguajes libres de contexto. Su función principal es la manipulación de producciones y la implementación del algoritmo de conversión a la **Forma Normal de Chomsky (FNC)**.
 
