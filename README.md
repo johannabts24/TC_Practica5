@@ -32,6 +32,11 @@ Donde "A" es el antecedente de la regla, que en el caso de las GIC debe ser nece
 Existe un teorema que prueba que cualquier GIC, cuyo lenguaje no contiene a la palabra vacía, si no lo está ya, se puede transformar en otra equivalente que sí esté en FNG. Para su demostración, normalmente, se procede por construcción, es decir, se plantea directamente un algoritmo capaz de obtener la FNG a partir de una GIC dada.
 
 
+**Pasos del Algoritmo para llegar a la forma normal de Greibach**:
+**Eliminación de Recursividad Izquierda**: Representa el paso más crítico del proceso. Si existe una regla de la forma $A \rightarrow A\alpha \mid \beta$, el algoritmo la transforma en una estructura no recursiva mediante la introducción de una variable auxiliar $Z$. Esto es vital para evitar bucles infinitos en los analizadores sintácticos descendentes.
+**Sustitución de Variables**: Se establece un orden jerárquico para las variables (ej. $A_1, A_2, \dots, A_n$). El objetivo es garantizar que para toda regla $A_i \rightarrow A_j\gamma$, se cumpla la condición $j > i$. En caso de que $j < i$, se sustituye $A_j$ por sus definiciones correspondientes hasta que la regla comience con un terminal o una variable de índice mayor.
+**Conversión Final**: Una vez que la gramática se encuentra debidamente ordenada, se realiza un proceso de sustitución hacia atrás ("back-substitution"). Esto asegura que todas las producciones de la gramática comiencen finalmente con un símbolo terminal, cumpliendo así con la definición estricta de la FNG.
+
 ### Forma normal de Chomsky 
 Una gramática formal está en Forma normal de Chomsky si todas sus reglas de producción son de alguna de las siguientes formas:
 
@@ -42,6 +47,12 @@ A, B y C
 Son símbolos no terminales (o variables) y α es un símbolo terminal.
 
 Todo lenguaje independiente del contexto que no posee a la cadena vacía, es expresable por medio de una gramática en forma normal de Chomsky (GFNCH) y recíprocamente. Además, dada una gramática independiente del contexto, es posible algorítmicamente producir una GFNCH equivalente, es decir, que genera el mismo lenguaje.
+
+**Pasos del Algoritmo para llegar a la forma normal de Chomsky**:
+**Sustitución del Símbolo Inicial**: Se añade una nueva regla $S_0 \rightarrow S$. Esto garantiza que el símbolo inicial real nunca aparezca en el lado derecho de una producción, evitando ciclos recursivos hacia el origen y asegurando la integridad de la estructura.
+**Eliminación de Producciones $\lambda$ (Epsilon)**: Se identifican los símbolos "anulables" (aquellos que pueden derivar en la cadena vacía). Para cada regla que contenga un símbolo anulable, el sistema genera automáticamente las nuevas reglas resultantes de omitir dicho símbolo, eliminando finalmente todas las reglas $A \rightarrow \lambda$.
+**Eliminación de Producciones Unitarias**: Las reglas del tipo $A \rightarrow B$ se eliminan sustituyéndolas por el conjunto de producciones de $B$. Este proceso optimiza la gramática reduciendo la "profundidad" innecesaria en el árbol de derivación.
+**Binarización de Producciones**: En casos donde una regla tiene más de dos variables (ej. $A \rightarrow BCD$), se introducen variables auxiliares ($X_1, X_2...$) para descomponer la cadena en pares jerárquicos: $A \rightarrow BX_1$ y $X_1 \rightarrow CD$, cumpliendo así con el estándar binario de la FNC.
 
 
 ## Funcionalidades del Sistema
@@ -86,11 +97,15 @@ La aplicación (desarrollada en Python con Tkinter) implementa los siguientes m�
     * Permite ingresar una expresion regular para poder transformarla a un Automata Finito
     * Una vez creado el AF permite vizualizar como es que este se ve
     * Opcion de poder guardar el AF convertido de la Expresion Regular 
-8. **Aplicaciones de Autómatas (Cajeros y Analizadores)**:
-* Implementación práctica de Autómatas Finitos para modelar el comportamiento de sistemas de control real.
-* Módulo de Cajero Automático: Simulación de estados para la gestión de retiros, validación de NIP y flujo de transacciones bancarias.
-* Analizador Léxico y Sintáctico: Aplicación de autómatas para el reconocimiento y clasificación de tokens dentro de una cadena de entrada.
-* Visualización interactiva del cambio de estados conforme el usuario interactúa con la interfaz del sistema.
+
+8. **Aplicaciones de Expresiones Regulares:**
+    * **Selector de Modelos de Validación**: Permite elegir mediante un menú desplegable entre diferentes patrones estándar como:
+        * **Correo Electrónico**: Validación de estructura `usuario@dominio.ext`.
+        * **URL**: Verificación sintáctica de protocolos y dominios web.
+        * **Fecha**: Validación de formato numérico `DD/MM/AAAA`.
+    * **Motor de Validación en Tiempo Real**: Al ingresar una cadena y ejecutar *"Validar y Graficar"*, el sistema procesa la entrada contra el autómata correspondiente.
+    * **Visualización Dinámica del Autómata**: Despliega gráficamente el modelo matemático que fundamenta la validación, permitiendo observar el recorrido de estados que realiza la cadena.
+    * **Retroalimentación Instantánea**: Determina de forma visual si la cadena es aceptada o rechazada por el lenguaje definido.
 
 9. **Transformación de Gramáticas (Forma Normal de Chomsky y Forma normal de Greibach)**:
 * Procesamiento y simplificación de Gramáticas Libres del Contexto (GLC) mediante algoritmos de normalización.
@@ -686,6 +701,201 @@ Este método constituye la contraparte del Teorema de Kleene, encargándose de t
 
 * **Salida de Control:** Se incluye un mensaje en consola confirmando la generación exitosa del AFN. Este mensaje sirve como una herramienta de depuración esencial durante el desarrollo de la práctica para verificar en tiempo real qué expresión está procesando el motor lógico.
 
+### Gestión y Transformación de Gramáticas (`class Grammar`)
+Esta clase constituye el núcleo del procesamiento de lenguajes libres de contexto. Su función principal es la manipulación de producciones y la implementación del algoritmo de conversión a la **Forma Normal de Chomsky (FNC)**.
+
+**Código Implementado**:
+```python
+class Grammar:
+    def __init__(self):
+        self.productions = []  # Almacena elementos en formato [izq, der]
+        self.start_symbol = None
+
+    def clear(self):
+        self.productions = []
+        self.start_symbol = None
+
+    def load_from_text(self, text):
+        self.clear()
+        lines = text.strip().split('\n')
+        for line in lines:
+            if '->' in line:
+                left, right_side = line.split('->')
+                left = left.strip()
+                if not self.start_symbol:
+                    self.start_symbol = left
+                for prod in right_side.split('|'):
+                    self.productions.append([left, prod.strip()])
+
+    def get_grammar_string(self, prods=None):
+        target = prods if prods is not None else self.productions
+        if not target:
+            return "Ø"
+        grouped = {}
+        for left, right in target:
+            if left not in grouped:
+                grouped[left] = []
+            grouped[left].append(right if (right and right not in ["λ", "ε", ""]) else "λ")
+        return "\n".join([f"{l} -> {' | '.join(r)}" for l, r in grouped.items()])
+
+    def to_chomsky(self):
+        """
+        Algoritmo robusto de conversión a la Forma Normal de Chomsky (FNC).
+        Muestra paso a paso todo el proceso en la bitácora.
+        """
+        history = []
+        
+        # ==========================================
+        # PASO 1: NUEVO SÍMBOLO INICIAL
+        # ==========================================
+        original_start = self.start_symbol
+        new_start = original_start + "'"
+        current_prods = [[new_start, original_start]] + copy.deepcopy(self.productions)
+        history.append(f"1. NUEVO INICIO:\nSe agrega {new_start} para evitar recursividad al inicio.\n" + self.get_grammar_string(current_prods))
+
+        # ==========================================
+        # PASO 2: ELIMINACIÓN DE PRODUCCIONES VACÍAS (λ)
+        # ==========================================
+        # Encontrar el conjunto de variables anulables
+        nullable = {p[0] for p in current_prods if p[1] in ["λ", "ε", ""]}
+        changed = True
+        while changed:
+            changed = False
+            for left, right in current_prods:
+                if left not in nullable and all(char in nullable for char in right if char.isupper()):
+                    nullable.add(left)
+                    changed = True
+
+        new_prods = []
+        for left, right in current_prods:
+            if right not in ["λ", "ε", ""]:
+                new_prods.append([left, right])
+                # Generar las combinaciones omitiendo los caracteres que son anulables
+                for i, char in enumerate(right):
+                    if char in nullable:
+                        variant = right[:i] + right[i+1:]
+                        if variant and [left, variant] not in new_prods:
+                            new_prods.append([left, variant])
+        current_prods = new_prods
+        history.append("2. ELIMINACIÓN DE λ:\nSe generaron variantes por símbolos anulables.\n" + self.get_grammar_string(current_prods))
+
+        # ==========================================
+        # PASO 3: ELIMINACIÓN DE PRODUCCIONES UNITARIAS
+        # ==========================================
+        changed = True
+        while changed:
+            changed = False
+            for i, (left, right) in enumerate(current_prods):
+                # Es una producción unitaria clásica: variable única en la derecha (ej. A -> B)
+                if len(right) == 1 and right.isupper():
+                    target = right
+                    current_prods.pop(i)
+                    for l, r in current_prods:
+                        if l == target and [left, r] not in current_prods:
+                            current_prods.append([left, r])
+                    changed = True
+                    break
+        history.append("3. ELIMINACIÓN DE UNITARIAS:\nSe sustituyeron las reglas unitarias A -> B.\n" + self.get_grammar_string(current_prods))
+
+        # ==========================================
+        # PASO 4: REEMPLAZO DE TERMINALES Y BINARIZACIÓN
+        # ==========================================
+        # Paso 4a: Reemplazar terminales en reglas de longitud >= 2 por variables auxiliares T_X
+        term_map = {}
+        processed_prods = []
+        for left, right in current_prods:
+            if len(right) == 1:
+                # Reglas del tipo A -> a ya están correctas para FNC, se preservan intactas
+                processed_prods.append([left, right])
+            else:
+                new_right = []
+                for char in right:
+                    if char.islower() or not char.isupper():  # Es un terminal
+                        t_var = f"T{char.upper()}"
+                        term_map[char] = t_var
+                        new_right.append(t_var)
+                    else:
+                        new_right.append(char)
+                processed_prods.append([left, new_right])
+
+        # Paso 4b: Binarizar únicamente los cuerpos que contengan 3 o más variables
+        bin_prods = []
+        counter = 1
+        for left, right in processed_prods:
+            # Si right es una lista de elementos (ej: ['Ta', 'A']), evaluamos su longitud
+            if len(right) <= 2:
+                # Si mide 1 o 2 variables (ej: ['Ta', 'A']), ya cumple FNC
+                bin_prods.append([left, "".join(right)])
+            else:
+                # Si mide 3 o más variables (ej: ['A', 'B', 'C']), las agrupamos secuencialmente con variables C_x
+                last_var = left
+                for i in range(len(right) - 2):
+                    new_v = f"C{counter}"
+                    counter += 1
+                    bin_prods.append([last_var, right[i] + new_v])
+                    last_var = new_v
+                bin_prods.append([last_var, right[-2] + right[-1]])
+
+        # Agregar al final de la gramática las reglas de mapeo de terminales (ej: Ta -> a)
+        for char, t_var in term_map.items():
+            if [t_var, char] not in bin_prods:
+                bin_prods.append([t_var, char])
+
+        current_prods = bin_prods
+        self.productions = current_prods
+        history.append("4. RESULTADO FINAL (FNC):\nProducciones ajustadas a la forma estricta A -> BC o A -> a.\n" + self.get_grammar_string(current_prods))
+
+        return "\n\n---\n\n".join(history)
+
+    def save_to_jff(self, path):
+        """
+        Exporta las producciones en formato XML compatible con la pestaña 'Grammar' de JFLAP.
+        """
+        structure = ET.Element('structure')
+        ET.SubElement(structure, 'type').text = 'grammar'
+        for left, right in self.productions:
+            prod_tag = ET.SubElement(structure, 'production')
+            ET.SubElement(prod_tag, 'left').text = left
+            right_tag = ET.SubElement(prod_tag, 'right')
+            if right not in ["λ", "ε", ""]:
+                right_tag.text = right
+            else:
+                right_tag.text = ""  # JFLAP requiere etiqueta vacía para lambdas
+        tree = ET.ElementTree(structure)
+        tree.write(path, encoding='utf-8', xml_declaration=True)
+```
+
+
+1. Inicialización y Limpieza (`__init__`, `clear`)
+Establece el estado base del motor gramatical.
+* **`self.productions`**: Almacena las reglas en una estructura de lista de listas `[izq, der]`.
+* **`self.start_symbol`**: Identifica el axioma inicial de la gramática.
+* **`clear()`**: Reinicia los atributos para permitir la carga de una nueva gramática sin rastro de la anterior.
+
+2. Carga y Serialización (`load_from_text`, `get_grammar_string`)
+Gestiona el flujo de entrada y salida de datos para que sean legibles por el usuario.
+* **Procesamiento de Texto**: `load_from_text` interpreta el formato estándar `A -> α | β`, separando las alternativas y detectando automáticamente el símbolo inicial.
+* **Generación de String**: `get_grammar_string` agrupa las producciones por su lado izquierdo para presentar una salida estética, reemplazando cadenas vacías por el símbolo λ.
+
+3. Conversión a Forma Normal de Chomsky (`to_chomsky`)
+Implementa un pipeline de 4 etapas para normalizar la gramática. Cada etapa registra su estado en un objeto `history` para fines didácticos.
+
+* **Paso 1: Nuevo Símbolo Inicial**: Crea una regla $S' \rightarrow S$ para garantizar que el símbolo inicial no aparezca en el lado derecho de ninguna producción.
+* **Paso 2: Eliminación de Producciones Vacías ($\lambda$)**:
+    * Identifica variables **anulables** (aquellas que pueden derivar en $\lambda$).
+    * Genera todas las combinaciones posibles de las reglas existentes omitiendo los símbolos anulables.
+* **Paso 3: Eliminación de Unitarias**: Detecta reglas del tipo $A \rightarrow B$ y las sustituye por las derivaciones directas de $B$, eliminando ciclos y redundancias.
+* **Paso 4: Reemplazo de Terminales y Binarización**:
+    * **Sustitución**: Las reglas con longitud $\ge 2$ reemplazan sus terminales por variables auxiliares ($T_X \rightarrow x$).
+    * **Binarización**: Las reglas con más de dos variables se fragmentan en una cascada de variables auxiliares ($C_1, C_2, \dots$) para cumplir estrictamente con el formato $A \rightarrow BC$.
+
+4. Exportación a JFLAP (`save_to_jff`)
+Traduce la estructura interna de Python al estándar XML de JFLAP.
+* Utiliza `xml.etree.ElementTree` para construir etiquetas `<structure>`, `<type>` y `<production>`.
+* **Compatibilidad**: Maneja específicamente el nodo `<right>` para asegurar que las transiciones vacías sean interpretadas correctamente por el software externo.
+
+**Resumen de funcionamiento**: El algoritmo no solo transforma la gramática, sino que actúa como un compilador educativo. Al final del proceso, el objeto `history` contiene una bitácora detallada que permite al usuario rastrear la evolución de sus reglas de producción desde su forma original hasta la FNC.
+
 ## Implementacion dentro del ```main.py```
 
 ### Librerias utilizadas
@@ -741,32 +951,6 @@ def __init__(self, root):
 
 **Resumen de funcionamiento**: El constructor prepara el estado interno del programa y levanta la estructura visual. Su lógica asegura que cada sección del simulador tenga su propio espacio de memoria (objetos `Automaton`) y su propia identidad visual, garantizando que el usuario siempre sepa en qué módulo se encuentra trabajando.
 
-### Forma normal de Geibach
-La FNG establece una restricción mucho más estricta que la FNC: cada producción debe comenzar obligatoriamente con un símbolo terminal, seguido opcionalmente de una secuencia de variables ($A \rightarrow a\alpha$). Esta forma es fundamental en la teoría de la computación para la construcción de Autómatas de Pila, ya que garantiza que cada paso de la derivación consuma exactamente un símbolo de la cadena de entrada.
-
-**Codigo implementado:**
-
-
-
-
-**Fases del Algoritmo**:
-**Eliminación de Recursividad Izquierda**: Representa el paso más crítico del proceso. Si existe una regla de la forma $A \rightarrow A\alpha \mid \beta$, el algoritmo la transforma en una estructura no recursiva mediante la introducción de una variable auxiliar $Z$. Esto es vital para evitar bucles infinitos en los analizadores sintácticos descendentes.
-**Sustitución de Variables**: Se establece un orden jerárquico para las variables (ej. $A_1, A_2, \dots, A_n$). El objetivo es garantizar que para toda regla $A_i \rightarrow A_j\gamma$, se cumpla la condición $j > i$. En caso de que $j < i$, se sustituye $A_j$ por sus definiciones correspondientes hasta que la regla comience con un terminal o una variable de índice mayor.
-**Conversión Final**: Una vez que la gramática se encuentra debidamente ordenada, se realiza un proceso de sustitución hacia atrás ("back-substitution"). Esto asegura que todas las producciones de la gramática comiencen finalmente con un símbolo terminal, cumpliendo así con la definición estricta de la FNG.
-
-### Forma normal de Chomsky
-El objetivo de este módulo es restringir una gramática libre del contexto para que todas sus producciones cumplan estrictamente con uno de dos formatos: $A \rightarrow BC$ (derivación a exactamente dos variables) o $A \rightarrow a$ (derivación a un solo terminal).
-
-**Código implementado:**
-
-
-
-
-**Fases del algoritmo**:
-**Sustitución del Símbolo Inicial**: Se añade una nueva regla $S_0 \rightarrow S$. Esto garantiza que el símbolo inicial real nunca aparezca en el lado derecho de una producción, evitando ciclos recursivos hacia el origen y asegurando la integridad de la estructura.
-**Eliminación de Producciones $\lambda$ (Epsilon)**: Se identifican los símbolos "anulables" (aquellos que pueden derivar en la cadena vacía). Para cada regla que contenga un símbolo anulable, el sistema genera automáticamente las nuevas reglas resultantes de omitir dicho símbolo, eliminando finalmente todas las reglas $A \rightarrow \lambda$.
-**Eliminación de Producciones Unitarias**: Las reglas del tipo $A \rightarrow B$ se eliminan sustituyéndolas por el conjunto de producciones de $B$. Este proceso optimiza la gramática reduciendo la "profundidad" innecesaria en el árbol de derivación.
-**Binarización de Producciones**: En casos donde una regla tiene más de dos variables (ej. $A \rightarrow BCD$), se introducen variables auxiliares ($X_1, X_2...$) para descomponer la cadena en pares jerárquicos: $A \rightarrow BX_1$ y $X_1 \rightarrow CD$, cumpliendo así con el estándar binario de la FNC.
 
 ### Pestaña 1 (CADENAS)
 ```python
@@ -1211,10 +1395,13 @@ La pestaña 7 funciona como un motor de síntesis lógica, permitiendo al usuari
 * Visualización Dinámica: El resultado se proyecta en un lienzo interactivo que muestra la estructura de estados y transiciones, facilitando la comprensión de cómo se descompone la lógica de la expresión en pasos finitos.
 * Exportación Directa: Al igual que en el módulo de construcción manual, se incluye la función Guardar .JFF, permitiendo descargar el autómata generado para su análisis externo o para cargarlo posteriormente en el Simulador del proyecto.
 
-La pestaña 8 se presenta como un módulo de implementación práctica, diseñado para demostrar cómo la teoría de autómatas se traduce en sistemas funcionales del mundo real.
-* Simulación de Sistemas: El usuario puede interactuar con modelos preconfigurados, como un Cajero Automático, donde cada acción (ingreso de NIP, selección de monto) dispara una transición de estado validada por la lógica del autómata subyacente.
-* Analizadores Lógicos: Incluye herramientas de análisis léxico que permiten descomponer cadenas de entrada para identificar patrones específicos, simulando el comportamiento de las primeras fases de un compilador.
-* Interactividad Visual: La interfaz resalta en tiempo real el estado actual y el camino recorrido, permitiendo al usuario comprender la secuencia lógica de decisiones que toma el sistema ante diferentes estímulos o entradas.
+Esta pestaña constituye la interfaz de usuario final, diseñada para demostrar la utilidad práctica de la teoría de autómatas mediante la validación de patrones de texto comunes. 
+* Selector de Tipo de Dato: El usuario dispone de un menú desplegable para elegir el modelo de validación deseado, incluyendo:
+   * Correo Electrónico: Valida la estructura estándar de una dirección de correo (usuario@dominio.extensión).
+   * URL: Verifica el formato sintáctico de direcciones web (protocolo, dominio y ruta).
+   * Fecha (DD/MM/AAAA): Valida la estructura numérica y el formato de fechas estándar.
+   * Entrada de Texto y Procesamiento: El sistema cuenta con un campo de texto donde el usuario ingresa la cadena a evaluar. Al presionar el botón *"Validar y Graficar"*, el motor interno procesa la entrada contra el autómata correspondiente al tipo de dato seleccionado.
+   * Retroalimentación y Visualización: El sistema ofrece una respuesta inmediata sobre la validez del formato (aceptación o rechazo de la cadena), y despliega de forma dinámica el **Autómata Finito** que fundamenta dicha validación, permitiendo al usuario visualizar el recorrido de los estados que la cadena realiza.
 
 Finalmente, la pestaña 9 constituye el motor de análisis y transformación de gramáticas, proporcionando un entorno robusto para el estudio de las Gramáticas Libres del Contexto (GLC).
 * Procesamiento de Producciones: Mediante un editor de texto especializado, el usuario introduce las reglas de derivación. El sistema interpreta la sintaxis para identificar símbolos terminales, no terminales y el símbolo inicial de la gramática.
